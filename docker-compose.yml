@@ -1,0 +1,15 @@
+version: "3.9"
+services:
+  bridge:
+    build: .
+    container_name: ha-device-bridge
+    environment:
+      - HA_URL=http://homeassistant.local:8123
+      - HA_TOKEN=REPLACE_WITH_LONG_LIVED_TOKEN
+      - DB_URL=sqlite:////data/bridge.db
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./data:/data
+    ports:
+      - "8787:8787"
+    restart: unless-stopped
