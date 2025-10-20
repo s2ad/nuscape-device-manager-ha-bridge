@@ -10,4 +10,4 @@ async def sse_stream(generator: AsyncIterator[dict]):
                 "data": json.dumps(ev["data"]) if "data" in ev else json.dumps(ev)
             }
             await asyncio.sleep(0)
-    return EventSourceResponse(event_publisher())
+    return EventSourceResponse(event_publisher(), ping=15)

@@ -16,15 +16,39 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 @app.on_event("startup")
 async def on_start():
     await catalog.init_db()
-    await catalog.full_sync()
+
+    async def do_full_sync_with_retry():
+        import asyncio, logging
+        log = logging.getLogger("startup")
+        delay = 2
+        while True:
+            try:
+                await catalog.full_sync()
+                log.info("Initial full_sync succeeded")
+                return
+            except Exception as e:
+                log.warning("full_sync failed: %s; retrying in %ss", e, delay)
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, 60)
+
+    # Kick off full sync in the background so startup doesn't crash on DNS/connectivity issues
+    asyncio.create_task(do_full_sync_with_retry())
+
     async def _broadcast(ev):
         await broadcaster.broadcast(ev)
     asyncio.create_task(catalog.ws_consumer(_broadcast))
 
 @app.get("/api/v1/status/stream")
 async def stream():
-    # sse_stream returns an EventSourceResponse; do not await it.
-    return sse_stream(broadcaster.register())
+    # wrap broadcaster.register() so it becomes an async generator,
+    # and return EventSourceResponse directly (not a coroutine).
+    from .sse import EventSourceResponse
+
+    async def event_generator():
+        async for ev in broadcaster.register():
+            yield ev
+
+    return EventSourceResponse(event_generator(), ping=15)
 
 @app.get("/")
 def root():

@@ -46,13 +46,26 @@ class Catalog:
                 new_state = ev.get("new_state")
                 if not new_state:
                     continue
+                # Extract fields before closing session to avoid DetachedInstanceError
+                state_val = new_state.get("state")
+                attrs_val = new_state.get("attributes", {})
+
                 with SessionLocal() as s:
                     ent = s.get(Entity, eid) or Entity(id=eid)
                     ent.domain = eid.split(".",1)[0]
-                    ent.state = new_state.get("state")
-                    ent.attributes = new_state.get("attributes", {})
+                    ent.state = state_val
+                    ent.attributes = attrs_val
                     s.merge(ent)
                     s.commit()
-                await broadcast_cb({"event":"state", "data":{"entity_id": eid, "state": ent.state, "attributes": ent.attributes}})
+
+                # Now broadcast using plain dicts, not ORM object
+                await broadcast_cb({
+                    "event": "state",
+                    "data": {
+                        "entity_id": eid,
+                        "state": state_val,
+                        "attributes": attrs_val,
+                    },
+                })
 
 catalog = Catalog()
