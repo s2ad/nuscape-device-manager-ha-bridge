@@ -23,7 +23,8 @@ async def on_start():
 
 @app.get("/api/v1/status/stream")
 async def stream():
-    return await sse_stream(broadcaster.register())
+    # sse_stream returns an EventSourceResponse; do not await it.
+    return sse_stream(broadcaster.register())
 
 @app.get("/")
 def root():
